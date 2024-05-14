@@ -3,13 +3,14 @@
 import asyncio
 from typing import Optional, List, Callable, Dict
 from TikTokLive import TikTokLiveClient
-from TikTokLive.types import FailedConnection, FailedParseUserHTML, FailedFetchRoomInfo, AlreadyConnecting
-from TikTokLive.types.events import CommentEvent, ConnectEvent, FollowEvent, ShareEvent, MoreShareEvent, LikeEvent, JoinEvent, GiftEvent, LiveEndEvent, ViewerUpdateEvent
-from TikTokLive import types
+#from TikTokLive.types import FailedConnection, FailedParseUserHTML, FailedFetchRoomInfo, AlreadyConnecting
+from TikTokLive.events import CommentEvent, ConnectEvent, FollowEvent, ShareEvent, LikeEvent, JoinEvent, GiftEvent, LiveEndEvent #, MoreShareEvent, ViewerUpdateEvent
+#from TikTokLive import types
 import threading
 
 import sys
 import time
+
 
 from TPPEntry import PLUGIN_ID, TP_PLUGIN_INFO, __version__, PLUGIN_NAME
 from TouchPortalAPI.logger import Logger
@@ -147,20 +148,21 @@ class TikTok_Client:
 
 
     def set_client(self, tiktok_channel):
-        self.tiktok = TikTokLiveClient(tiktok_channel, **{
-            "process_initial_data": False  # Spams cached messages on start, must be disabled   
-        })
+        self.tiktok = TikTokLiveClient(unique_id=f"@{tiktok_channel}")
+      # self.tiktok = TikTokLiveClient(tiktok_channel, **{
+      #  #   "process_initial_data": False  # Spams cached messages on start, must be disabled   
+      # })
         g_log.info("Adding Listeners")
         
-        self.tiktok.add_listener("comment", self.on_comment)
-        self.tiktok.add_listener("follow", self.on_follow)
-        self.tiktok.add_listener("like", self.on_like)
-        self.tiktok.add_listener("share", self.on_share)
-        self.tiktok.add_listener("join", self.on_join)
-        self.tiktok.add_listener("gift", self.on_gift)
-        self.tiktok.add_listener("viewer_update", self.on_viewercountUpdate)
-        self.tiktok.add_listener("connect", self.on_connect)
-        self.tiktok.add_listener("disconnect", self.on_disconnect)
+        self.tiktok.add_listener("CommentEvent", self.on_comment)
+     #  self.tiktok.add_listener("FollowEvent", self.on_follow)
+     #  self.tiktok.add_listener("LikeEvent", self.on_like)
+     #  self.tiktok.add_listener("ShareEvent", self.on_share)
+     #  self.tiktok.add_listener("JoinEvent", self.on_join)
+     #  self.tiktok.add_listener("GiftEvent", self.on_gift)
+    #    self.tiktok.add_listener("viewer_update", self.on_viewercountUpdate)
+        self.tiktok.add_listener("ConnectEvent", self.on_connect)
+        self.tiktok.add_listener("DisconnectEvent", self.on_disconnect)
         self.tiktok.add_listener("live_end", self.on_disconnect)
         g_log.info("Starting TikTok Live Chat")
         return self.tiktok
@@ -220,11 +222,14 @@ class TikTok_Client:
     
     def update_message_states(self,event):
         for index, message in enumerate(self.last_5_messages):
+            print("HERE IS THE EVENT \n\n", event.__dict__)
+
+          #  print(event.__dict__)
             TPClient.createState(PLUGIN_ID + f".state.message_{index + 1}.Username", f"Message_{index + 1} - Username", str(message['nickname']))
             TPClient.createState(PLUGIN_ID + f".state.message_{index + 1}.Message", f"Message_{index + 1} - Message", str(message['comment']))
-            TPClient.createState(PLUGIN_ID + f".state.message_{index + 1}.UserID", f"Message_{index + 1} - UserID", str(event.user.user_id))
-            TPClient.createState(PLUGIN_ID + f".state.message_{index + 1}.Followers", f"Message_{index + 1} - Followers", str(event.user.info.followers))
-            TPClient.createState(PLUGIN_ID + f".state.message_{index + 1}.FollowerRole", f"Message_{index + 1} - FollowerRole", str(event.user.info.follow_role))
+            TPClient.createState(PLUGIN_ID + f".state.message_{index + 1}.UserID", f"Message_{index + 1} - UserID", str(event.user.nickname))
+            TPClient.createState(PLUGIN_ID + f".state.message_{index + 1}.Followers", f"Message_{index + 1} - Followers", str(event.user.follow_info.following_count))
+            TPClient.createState(PLUGIN_ID + f".state.message_{index + 1}.FollowerRole", f"Message_{index + 1} - FollowerRole", str(event.user.info.follow_status))
 
             ## do avatar later
             #  TPClient.createState(PLUGIN_ID + f".act.message_{index + 1}.Avatar", f"Message_{index + 1} - Avatar", str(event.user.avatar.urls[0]))
@@ -287,7 +292,7 @@ class TikTok_Client:
         When the Streamer connects to TikTok Live Chat
         """
         g_log.info("Connected to Room ID: %s", tk.tiktok.room_id)
-        room_info = await tk.tiktok.retrieve_room_info()
+        room_info = await tk.tiktok.room_info()
         TPClient.stateUpdate(PLUGIN_ID + ".state.ShareURL", str(room_info['share_url']))
 
 
@@ -305,6 +310,8 @@ class TikTok_Client:
         Called when a comment is received
         - Updates associated TouchPortal States
         """
+        print("something")
+        print(event.user.nickname, event.comment)
         g_log.debug(f"{event.user.nickname} -> {event.comment}")
         #keeping only the last 5 messages in a variable at any given time.. 
         tk.last_5_messages.append({'nickname': event.user.nickname, 'comment':event.comment})
@@ -317,7 +324,7 @@ class TikTok_Client:
         """
         When a user follows the stream
         """
-        message: str = f"{event.user.user_id} followed!{event.user.user_id}"
+        message: str = f"{event.user.nickname} followed!"
         g_log.debug(message)
         await tk.update_states_from_events(event, "Follower")
 
@@ -328,7 +335,7 @@ class TikTok_Client:
         When a user likes the stream
         - Updates associated TouchPortal States
         """
-        message: str = f"{event.user.user_id} liked the stream {event.likes} times, there is now {event.total_likes} total likes!"
+        message: str = f"{event.user.nickname} liked the stream {event.likes} times, there is now {event.total_likes} total likes!"
         g_log.debug(message)
         await tk.update_states_from_events(event, "Like")
 
@@ -373,25 +380,25 @@ class TikTok_Client:
 
 
 
-    async def on_viewercountUpdate(self, event: ViewerUpdateEvent):
-        """
-        Called when the viewer count changes
-        - Updates associated TouchPortal States
-        """
-        TPClient.stateUpdate(PLUGIN_ID + ".state.viewer_count", str(event.viewer_count))
-        for x in event.top_viewers[0:5]:
-            TPClient.createState(PLUGIN_ID + f".state.top_viewer_{event.top_viewers.index(x) + 1}.Name",
-                                f"Top Viewer {event.top_viewers.index(x) + 1} - Name",
-                                str(x.user.nickname),
-                                "Top 5 Viewers")
-            TPClient.createState(PLUGIN_ID + f".state.top_viewer_{event.top_viewers.index(x) + 1}.UserID",
-                                f"Top Viewer {event.top_viewers.index(x) + 1} - UserID",
-                                str(x.user.user_id),
-                                "Top 5 Viewers")
-            TPClient.createState(PLUGIN_ID + f".state.top_viewer_{event.top_viewers.index(x) + 1}.CoinsGiven",
-                                f"Top Viewer {event.top_viewers.index(x) + 1} - CoinsGiven",
-                                str(x.coins_given),
-                                "Top 5 Viewers")
+   # async def on_viewercountUpdate(self, event: ViewerUpdateEvent):
+   #     """
+   #     Called when the viewer count changes
+   #     - Updates associated TouchPortal States
+   #     """
+   #     TPClient.stateUpdate(PLUGIN_ID + ".state.viewer_count", str(event.viewer_count))
+   #     for x in event.top_viewers[0:5]:
+   #         TPClient.createState(PLUGIN_ID + f".state.top_viewer_{event.top_viewers.index(x) + 1}.Name",
+   #                             f"Top Viewer {event.top_viewers.index(x) + 1} - Name",
+   #                             str(x.user.nickname),
+   #                             "Top 5 Viewers")
+   #         TPClient.createState(PLUGIN_ID + f".state.top_viewer_{event.top_viewers.index(x) + 1}.UserID",
+   #                             f"Top Viewer {event.top_viewers.index(x) + 1} - UserID",
+   #                             str(x.user.user_id),
+   #                             "Top 5 Viewers")
+   #         TPClient.createState(PLUGIN_ID + f".state.top_viewer_{event.top_viewers.index(x) + 1}.CoinsGiven",
+   #                             f"Top Viewer {event.top_viewers.index(x) + 1} - CoinsGiven",
+   #                             str(x.coins_given),
+   #                             "Top 5 Viewers")
     
 
 ## Main
@@ -493,15 +500,46 @@ def run_tk():
         tk.thread.start()
 
 
-
+#
 if __name__ == "__main__":
     tk = TikTok_Client()
     tk.stop_TikTok_Thread()
     result = main()
     tk.stop_TikTok_Thread()
-    tk.tiktok.stop()
+  #  tk.tiktok.stop()
     sys.exit(main())
 
+
+
+
+
+
+
+#           from TikTokLive import TikTokLiveClient
+#           from TikTokLive.events import ConnectEvent, CommentEvent
+#           
+#           # Create the client
+#           client: TikTokLiveClient = TikTokLiveClient(unique_id="@fabbi_oficial")
+#           
+#           
+#           # Listen to an event with a decorator!
+#           @client.on(ConnectEvent)
+#           async def on_connect(event: ConnectEvent):
+#               print(f"Connected to @{event.unique_id} (Room ID: {client.room_id}")
+#           
+#           
+#           # Or, add it manually via "client.add_listener()"
+#           async def on_comment(event: CommentEvent) -> None:
+#               print(f"{event.user.nickname} -> {event.comment}")
+#           
+#           
+#           client.add_listener(CommentEvent, on_comment)
+#           
+#           if __name__ == '__main__':
+#               # Run the client and block the main thread
+#               # await client.start() to run non-blocking
+#               client.run()
+#           
 
 
 
