@@ -291,7 +291,7 @@ class TikTok_Client:
         TPClient.stateUpdate(PLUGIN_ID + ".state.ShareURL", str(room_info['share_url']))
 
 
-    def on_disconnect(eself, event: LiveEndEvent):
+    def on_disconnect(self, event: LiveEndEvent):
         """ 
         When the Streamer disconnects from TikTok Live Chat
         """
@@ -499,8 +499,9 @@ if __name__ == "__main__":
     tk.stop_TikTok_Thread()
     result = main()
     tk.stop_TikTok_Thread()
-    tk.tiktok.stop()
-    sys.exit(main())
+    if tk.tiktok:
+        tk.tiktok.stop()
+    sys.exit(result)
 
 
 
