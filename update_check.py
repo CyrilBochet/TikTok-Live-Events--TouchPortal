@@ -9,18 +9,17 @@ GITHUB_USER_NAME = "GitagoGaming"
 GITHUB_PLUGIN_NAME = "TikTok-Live-Events--TouchPortal"
 
 
-
-def plugin_update_check(plugin_version:str):
-    """ Checks Github for the latest version of the plugin
-    - Returns patchnotes on notification if there is a new version 
-    """
+def plugin_update_check(plugin_version: str):
+    """Checks GitHub for the latest version of the plugin."""
     try:
         github_check = TouchPortalAPI.Tools.updateCheck(GITHUB_USER_NAME, GITHUB_PLUGIN_NAME)
-      
-        if github_check.replace('v','').replace(".","") > plugin_version:
-            ### Pulling Patch Notes for Notification
+
+        if github_check.replace('v', '').replace('.', '') > plugin_version:
+            # Pull patch notes for notification
             try:
-                r = requests.get(f"https://api.github.com/repos/{GITHUB_USER_NAME}/{GITHUB_PLUGIN_NAME}/contents/recent_patchnotes.txt") 
+                r = requests.get(
+                    f"https://api.github.com/repos/{GITHUB_USER_NAME}/{GITHUB_PLUGIN_NAME}/contents/recent_patchnotes.txt"
+                )
                 if r.status_code == 404:
                     print("No Patch Notes Found")
                     message = ""
@@ -34,10 +33,7 @@ def plugin_update_check(plugin_version:str):
             return github_check, message
         else:
             return False, False
-        
+
     except Exception as e:
         print("Something went wrong checking update", e)
-        
-        
-        
-        
+        return False, False
